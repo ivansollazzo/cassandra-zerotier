@@ -14,7 +14,7 @@ services:
         # Local storage 
         volumes:
             - cassandra-data1:/var/lib/data
-        # Configures cassandra enviroment variable
+        # Configures cassandra enviroment variables
         environment:
             - CASSANDRA_SEEDS=node1 # First node is seed node
             - CASSANDRA_START_RPC=false # No rpc server started
