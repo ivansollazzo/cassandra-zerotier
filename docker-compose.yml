@@ -1,0 +1,130 @@
+version: "3.9"
+services:
+    # The first node in the datacenter
+    cnode1:
+        # Container settings 
+        image: my-cassandra-build
+        container_name: cassandra-node1
+        hostname: node1
+        restart: always # Recover from failure
+        # Uses static ip addressing
+        networks:
+            cassandra-network:
+                ipv4_address: 172.30.0.2
+        # Local storage 
+        volumes:
+            - cassandra-data1:/var/lib/data
+        # Configures cassandra enviroment variable
+        environment:
+            - CASSANDRA_SEEDS=node1 # First node is seed node
+            - CASSANDRA_START_RPC=false # No rpc server started
+            - CASSANDRA_CLUSTER_NAME=cassandra_cluster
+            - CASSANDRA_NUM_TOKENS=3
+            - CASSANDRA_DC=DC1 
+            - CASSANDRA_RACK=RAC1 
+            - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch # Snitch implementetion
+            - MAX_HEAP_SIZE=512M # Limits RAM usage
+            - HEAP_NEWSIZE=100M
+        # Enables intra-communication port e cqlsh port 
+        ports:
+            - 7000:7000
+            - 9042:9042
+        # Net capabalities in order to add ip route
+        cap_add:
+            - NET_ADMIN
+    # Second node
+    cnode2:
+        # Container settings 
+        image: my-cassandra-build
+        container_name: cassandra-node2
+        hostname: node2
+        restart: always # Recover from failure
+        # Uses static ip addressing
+        networks:
+            cassandra-network:
+                ipv4_address: 172.30.0.3
+        # Local storage 
+        volumes:
+            - cassandra-data2:/var/lib/data
+        # Configures cassandra enviroment variable
+        environment:
+            - CASSANDRA_SEEDS=node1 # First node is seed node
+            - CASSANDRA_START_RPC=false # No rpc server started
+            - CASSANDRA_CLUSTER_NAME=cassandra_cluster
+            - CASSANDRA_NUM_TOKENS=3
+            - CASSANDRA_DC=DC1 # Cassandra datacenter name
+            - CASSANDRA_RACK=RAC1 # Cassandra rack name
+            - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch # Snitch implementetion
+            - MAX_HEAP_SIZE=512M # Limits RAM usage
+            - HEAP_NEWSIZE=100M
+        # Enables intra-communication port e cqlsh port 
+        ports:
+            - 1700:7000
+            - 9043:9042
+        # Node1 has to be up and running before node2
+        depends_on:
+            - cnode1
+    # Third node
+    cnode3:
+        # Container settings 
+        image: my-cassandra-build
+        container_name: cassandra-node3
+        hostname: node3
+        restart: always
+        # Uses static ip addressing
+        networks:
+            cassandra-network:
+                ipv4_address: 172.30.0.4
+        # Local storage
+        volumes:
+            - cassandra-data3:/var/lib/data
+        # Configures cassandra enviroment variable
+        environment:
+            - CASSANDRA_SEEDS=node1 # first node is seed node
+            - CASSANDRA_START_RPC=false # No rpc server started
+            - CASSANDRA_CLUSTER_NAME=cassandra_cluster
+            - CASSANDRA_NUM_TOKENS=3
+            - CASSANDRA_DC=DC2 # Cassandra datacenter name (different dc)
+            - CASSANDRA_RACK=RAC1 # Cassandra rack name
+            - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch # Snitch implementetion
+            - MAX_HEAP_SIZE=512M # Limits RAM usage
+            - HEAP_NEWSIZE=100M
+        # Enables intra-communication port e cqlsh port 
+        ports:
+            - 1701:7000
+            - 9044:9042
+        # Node1 has to be up and running before node3
+        depends_on:
+            - cnode2
+    # Vpn contiainer is the gateway to vpn network for cassandra nodes
+    zerotier-vpn:
+        # Run centos image
+        image: centos:7
+        container_name: zerotier-vpn
+        hostname: vpn-gw
+        restart: always
+        # Adds system and network capabilities
+        cap_add:
+            - NET_ADMIN
+            - SYS_ADMIN
+        devices: 
+            - /dev/net/tun
+        # Connected in the same network of the cassandra nodes with static ip
+        networks:
+            cassandra-network:
+                ipv4_address: 172.30.0.5
+        command: /bin/bash
+        stdin_open: true
+        tty: true
+# Creates data volumes inside composer
+volumes:
+  cassandra-data1:
+  cassandra-data2:
+  cassandra-data3:
+# Creates network inside composer
+networks:
+    cassandra-network:
+        ipam:
+            driver: default
+            config:
+                - subnet: 172.30.0.0/16
